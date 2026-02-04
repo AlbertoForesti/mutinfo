@@ -1,7 +1,11 @@
 # @package _global_
 
+name:
+  estimator: MINDE
+
 estimator:
   _target_: mutinfo.estimators.base.TransformedMutualInformationEstimator
+  variant: c
   estimator:
     _target_: mutinfo.estimators.parametric.minde.MINDE
     backbone_factory:
@@ -22,6 +26,9 @@ estimator:
     transforms:
     - _target_: sklearn.preprocessing.RobustScaler
     - _target_: sklearn.preprocessing.RobustScaler
+
+key:
+  estimator: ${name.estimator}/variant=${estimator.variant}/hidden=${estimator.estimator.backbone_factory.hidden_dim}
 
 parameters_counter:
   _target_: builtins.eval

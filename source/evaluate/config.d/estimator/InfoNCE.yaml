@@ -26,6 +26,8 @@ estimator:
     estimate_batch_size: 512
     estimate_size: 0.5 # `null` for no splitting.
     device: "cuda"
+    wandb_project: infonce
+    wandb_name: ${wandb_legal_name:infonce_${key.distribution}_bs_${estimator.estimator.estimate_batch_size}_hd_${estimator.estimator.backbone_factory.hidden_dim}_${now:%Y-%m-%d_%H-%M-%S}}
   transform:
     _target_: mutinfo.estimators.base.JointTransform
     transforms:
@@ -43,5 +45,5 @@ hydra:
   sweeper:
     params:
       #++estimator.estimator.estimate_size: null, 0.5
-      ++estimator.estimator.backbone_factory.hidden_dim: 16, 32, 64, 128
-      ++estimator.estimator.estimate_batch_size: 64, 128, 256, 512
+      ++estimator.estimator.backbone_factory.hidden_dim: 128 # 16, 32, 64, 128
+      ++estimator.estimator.estimate_batch_size: 512 # 64, 128, 256, 512

@@ -68,15 +68,30 @@ class ResNetClassifier(nn.Module):
     """
     def __init__(self, backbone_name='resnet18', num_classes=10, embeddings_dim=128):
         super().__init__()
+        self.backbone_name = backbone_name
+        self.num_classes = num_classes
         # Load backbone
-        backbone = getattr(torchvision.models, backbone_name)(num_classes=embeddings_dim)
+        backbone = getattr(torchvision.models, backbone_name)()
         self.backbone = adapt_backbone_to_CIFAR(backbone)
-        
-        # Replace the final FC layer for CIFAR-10 classification
-        self.backbone.fc = nn.Linear(512, num_classes)  # ResNet18 has 512 features
+
+        # ResNet outputs a pooled feature vector of size `backbone.fc.in_features`
+        backbone_features = self.backbone.fc.in_features
+        self.backbone.fc = nn.Identity()
+
+        # Learnable embedding projection, then classifier
+        self.embedding_head = nn.Linear(backbone_features, embeddings_dim)
+        self.classifier = nn.Linear(embeddings_dim, num_classes)
         
     def forward(self, x):
-        return self.backbone(x)
+        features = self.backbone(x)
+        embeddings = self.embedding_head(features)
+        return self.classifier(embeddings)
+
+    @torch.no_grad()
+    def embed(self, x):
+        """Return learned embeddings of shape (N, embeddings_dim)."""
+        features = self.backbone(x)
+        return self.embedding_head(features)
 
 
 def train_epoch(model, trainloader, criterion, optimizer, device):
@@ -148,6 +163,15 @@ def save_checkpoint(model, optimizer, epoch, train_acc, test_acc, checkpoint_dir
         'train_acc': train_acc,
         'test_acc': test_acc,
     }
+
+    # Helpful metadata for embedding extraction / reproducibility
+    if hasattr(model, 'backbone_name'):
+        checkpoint['backbone_name'] = model.backbone_name
+    if hasattr(model, 'num_classes'):
+        checkpoint['num_classes'] = model.num_classes
+    if hasattr(model, 'embedding_head'):
+        checkpoint['embeddings_dim'] = int(model.embedding_head.out_features)
+        checkpoint['backbone_features'] = int(model.embedding_head.in_features)
     
     # Save latest checkpoint
     checkpoint_path = checkpoint_dir / f'checkpoint_epoch_{epoch}.pt'

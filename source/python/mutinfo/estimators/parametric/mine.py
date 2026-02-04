@@ -2,6 +2,7 @@ import math
 import numpy
 import torch
 import torchfd
+import wandb
 
 from collections.abc import Callable
 
@@ -42,6 +43,9 @@ class MINE(MutualInformationEstimator):
         estimate_size: float=0.5,
         clip: float=None,
         device: str="cpu",
+        wandb_project: str=None,
+        wandb_entity: str=None,
+        wandb_name: str=None,
         **kwargs,
     ) -> None:
         super().__init__(**kwargs)
@@ -68,6 +72,9 @@ class MINE(MutualInformationEstimator):
         self.estimate_size = estimate_size
         self.clip = clip
         self.device = device
+        self.wandb_project = wandb_project
+        self.wandb_entity = wandb_entity
+        self.wandb_name = wandb_name
 
     def __call__(self, x: numpy.ndarray, y: numpy.ndarray) -> float:
         """
@@ -125,15 +132,74 @@ class MINE(MutualInformationEstimator):
         loss = self.loss_factory()
         optimizer = self.optimizer_factory(backbone.parameters())
 
+        def evaluate_loss(dataloader: torch.utils.data.DataLoader) -> float:
+            backbone_was_training = backbone.training
+            loss_was_training = getattr(loss, "training", None)
+
+            backbone.eval()
+            if hasattr(loss, "eval"):
+                loss.eval()
+
+            losses = []
+            with torch.no_grad():
+                for x_batch, y_batch in dataloader:
+                    batch_loss = loss(
+                        *backbone(
+                            x_batch.to(self.device),
+                            y_batch.to(self.device),
+                        )
+                    )
+                    losses.append(float(batch_loss.detach().cpu().item()))
+
+            if backbone_was_training:
+                backbone.train()
+            else:
+                backbone.eval()
+
+            if loss_was_training is not None and hasattr(loss, "train") and hasattr(loss, "eval"):
+                if loss_was_training:
+                    loss.train()
+                else:
+                    loss.eval()
+
+            return float(numpy.mean(losses)) if losses else float("nan")
+
+        # Initialize wandb run if configured
+        if self.wandb_project is not None:
+            wandb.init(
+                project=self.wandb_project,
+                entity=self.wandb_entity,
+                name=self.wandb_name,
+            )
+
         step = 0
         while step < self.n_train_steps:
+            estimated_MI = backbone.get_mutual_information(
+                estimate_dataloader,
+                loss,
+                self.device,
+                clip=self.clip,
+            )
+
+            eval_loss = evaluate_loss(estimate_dataloader)
+
+            # Log estimated MI to wandb
+            if wandb.run is not None:
+                wandb.log({"estimated_MI": estimated_MI, "eval_loss": eval_loss}, step=step)
+
             for batch in train_dataloader:
                 optimizer.zero_grad()
                 
                 x, y = batch
-                loss(*backbone(x.to(self.device), y.to(self.device))).backward()
+                batch_loss = loss(*backbone(x.to(self.device), y.to(self.device)))
+                batch_loss.backward()
 
                 optimizer.step()
+                
+                # Log loss to wandb
+                if wandb.run is not None:
+                    wandb.log({"loss": batch_loss.item()}, step=step)
+                
                 step += 1
 
         estimated_MI = backbone.get_mutual_information(
@@ -142,6 +208,13 @@ class MINE(MutualInformationEstimator):
             self.device,
             clip=self.clip,
         )
+
+        eval_loss = evaluate_loss(estimate_dataloader)
+
+        # Log estimated MI to wandb
+        if wandb.run is not None:
+            wandb.log({"estimated_MI": estimated_MI, "eval_loss": eval_loss}, step=step)
+            wandb.finish()
 
         return max(estimated_MI, 0.0)
 

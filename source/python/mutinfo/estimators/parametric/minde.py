@@ -1,5 +1,6 @@
 import pytorch_lightning as pl
 from omegaconf import DictConfig
+from mutinfo.estimators.base import MutualInformationEstimator
 from . import minde_utils
 from functools import partial
 from sklearn.model_selection import train_test_split
@@ -14,7 +15,7 @@ import os
 import numpy
 
 
-class GenerativeMIEstimator(pl.LightningModule):
+class GenerativeMIEstimator(pl.LightningModule, MutualInformationEstimator):
     def __init__(self, 
                  name: str,
                  backbone_factory: callable,

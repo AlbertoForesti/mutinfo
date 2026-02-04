@@ -18,7 +18,7 @@ def ndarray_representer(dumper: yaml.Dumper, array: numpy.ndarray) -> yaml.Node:
 
 #OmegaConf.register_new_resolver("round", lambda x, n_digits=1: round(float(x), n_digits))
 OmegaConf.register_new_resolver("round", lambda x, n_digits=1: f"{float(x):.{int(n_digits)}f}")
-
+OmegaConf.register_new_resolver("wandb_legal_name", lambda name: name.replace("/", "_").replace(" ", "_"))
 
 @hydra.main(version_base=None, config_path="./config.d", config_name="config")
 def run_test(config : DictConfig) -> None:
