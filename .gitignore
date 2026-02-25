@@ -35,3 +35,7 @@ train_flow.ipynb
 wandb/
 
 *.pt
+!source/python/mutinfo/distributions/generative/configs/
+!source/python/mutinfo/distributions/generative/configs/**
+!source/python/mutinfo/distributions/generative/configs/**/*.yaml
+!source/evaluate/config.d/**/*.yaml

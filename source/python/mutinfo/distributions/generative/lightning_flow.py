@@ -81,6 +81,8 @@ class FlowLightningModule(pl.LightningModule):
                 self.data_type = 'image'
         elif prior_dim == 2:
             self.data_type = '2d'
+        elif prior_dim == 3:
+            self.data_type = '3d'
         elif prior_dim == 784:
             self.data_type = 'mnist'
             self.image_shape = (1, 28, 28)
@@ -214,7 +216,7 @@ class FlowLightningModule(pl.LightningModule):
         # Generate samples from prior
         try:
             with torch.no_grad():
-                n_samples = min(self.n_samples_to_log, 64)
+                n_samples = self.n_samples_to_log
                 samples = self.generate_samples(
                     n_samples=n_samples,
                     num_steps=50,  # Use fewer steps for faster logging
@@ -233,8 +235,8 @@ class FlowLightningModule(pl.LightningModule):
                     )
                     plt.close(fig)
                 
-                # For 2D data, also log the ODE trajectory
-                if self.data_type == '2d':
+                # For 2D/3D data, also log the ODE trajectory
+                if self.data_type in ('2d', '3d'):
                     fig_trajectory = self._log_ode_trajectory(n_samples=min(1000, n_samples * 10))
                     if fig_trajectory is not None:
                         import wandb
@@ -310,7 +312,19 @@ class FlowLightningModule(pl.LightningModule):
             ax.grid(True, alpha=0.3)
             ax.axis('equal')
             return fig
-        
+
+        elif self.data_type == '3d':
+            # 3D scatter plot
+            fig = plt.figure(figsize=(7, 6))
+            ax = fig.add_subplot(111, projection='3d')
+            ax.scatter(samples_np[:, 0], samples_np[:, 1], samples_np[:, 2],
+                       alpha=0.4, s=8)
+            ax.set_xlabel('x')
+            ax.set_ylabel('y')
+            ax.set_zlabel('z')
+            ax.set_title(title)
+            return fig
+
         elif self.data_type in ['mnist', 'cifar', 'image']:
             # Image grid for MNIST, CIFAR, etc.
             n_samples = len(samples_np)
@@ -370,26 +384,26 @@ class FlowLightningModule(pl.LightningModule):
         Returns:
             matplotlib figure or None
         """
-        if self.data_type != '2d':
+        if self.data_type not in ('2d', '3d'):
             return None
-        
+
         try:
             with torch.no_grad():
                 # Choose model
                 model = self.ema.module if (self.use_ema and self.ema is not None) else self.model
-                
+
                 # Start from prior
                 x = self.sample_prior(n_samples)
-                
+
                 # Store trajectory
                 trajectory = [x.cpu().numpy()]
                 time_steps = torch.linspace(1.0, 0.0, n_steps + 1)
-                
+
                 # Integrate ODE
                 dt = 1.0 / n_steps
                 for step in range(n_steps):
                     t = torch.ones(n_samples, 1, device=self.device) * (1 - step * dt)
-                    
+
                     # Check if model has step method (like FlowMLP)
                     if hasattr(model, 'step'):
                         t_start = time_steps[step]
@@ -398,26 +412,45 @@ class FlowLightningModule(pl.LightningModule):
                     else:
                         dx = model(t, x)
                         x = x - dx * dt
-                    
+
                     trajectory.append(x.cpu().numpy())
-                
-                # Create figure with subplots
-                fig, axes = plt.subplots(1, n_steps + 1, figsize=(3 * (n_steps + 1), 3), 
-                                        sharex=True, sharey=True)
-                
-                # Plot each timestep
-                for i, (ax, t_val) in enumerate(zip(axes, time_steps)):
-                    samples = trajectory[i]
-                    ax.scatter(samples[:, 0], samples[:, 1], s=5, alpha=0.5)
-                    ax.set_title(f't = {t_val:.2f}')
-                    ax.grid(True, alpha=0.3)
-                    ax.set_xlim(-3.0, 3.0)
-                    ax.set_ylim(-3.0, 3.0)
-                    ax.set_aspect('equal')
-                    
-                    if i == 0:
-                        ax.set_ylabel('y')
-                    ax.set_xlabel('x')
+
+                if self.data_type == '2d':
+                    # 2D subplots, one per timestep
+                    fig, axes = plt.subplots(1, n_steps + 1,
+                                            figsize=(3 * (n_steps + 1), 3),
+                                            sharex=True, sharey=True)
+
+                    for i, (ax, t_val) in enumerate(zip(axes, time_steps)):
+                        samples = trajectory[i]
+                        ax.scatter(samples[:, 0], samples[:, 1], s=5, alpha=0.5)
+                        ax.set_title(f't = {t_val:.2f}')
+                        ax.grid(True, alpha=0.3)
+                        ax.set_xlim(-3.0, 3.0)
+                        ax.set_ylim(-3.0, 3.0)
+                        ax.set_aspect('equal')
+                        if i == 0:
+                            ax.set_ylabel('y')
+                        ax.set_xlabel('x')
+
+                else:  # '3d'
+                    # 3D subplots, one per timestep
+                    fig = plt.figure(figsize=(3 * (n_steps + 1), 3))
+                    lim = 3.0
+
+                    for i, t_val in enumerate(time_steps):
+                        ax = fig.add_subplot(1, n_steps + 1, i + 1, projection='3d')
+                        samples = trajectory[i]
+                        ax.scatter(samples[:, 0], samples[:, 1], samples[:, 2],
+                                   s=3, alpha=0.4)
+                        ax.set_title(f't = {t_val:.2f}')
+                        ax.set_xlim(-lim, lim)
+                        ax.set_ylim(-lim, lim)
+                        ax.set_zlim(-lim, lim)
+                        ax.set_xlabel('x')
+                        if i == 0:
+                            ax.set_ylabel('y')
+                            ax.set_zlabel('z')
                 
                 plt.suptitle(f'ODE Trajectory (Prior → Data, Epoch {self.current_epoch})', fontsize=14)
                 plt.tight_layout()

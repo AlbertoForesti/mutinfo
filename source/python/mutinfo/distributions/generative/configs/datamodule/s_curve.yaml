@@ -1,5 +1,5 @@
-# Make Moons DataModule configuration
-# Uses sklearn's make_moons for 2D crescent-shaped data
+# Make s_curve DataModule configuration
+# Uses sklearn's make_s_curve for 2D crescent-shaped data
 
 _target_: mutinfo.distributions.generative.datamodule.CustomFlowDataModule
 n_train_samples: 50000
@@ -8,9 +8,9 @@ n_test_samples: 10000
 batch_size: 256
 num_workers: 0
 
-# Data generator using sklearn make_moons
+# Data generator using sklearn make_s_curve
 data_generator:
-  _target_: sklearn.datasets.make_moons
+  _target_: sklearn.datasets.make_s_curve
   _partial_: true
   noise: 0.05
   random_state: 42

@@ -6,11 +6,8 @@ to_be_seeded:
   - torch
 
 default_grid:
-  mutual_information: range(0.0, 11.0, 1.0)
-  dimensionality: 2
-
-raw:
-  mutual_information: 0.0
+  mutual_information: range(0.0, 11.0)
+  nonzero_mutual_information: range(1.0, 11.0)
 
 processed:
   mutual_information: ${raw.mutual_information}

@@ -32,7 +32,7 @@ def train(cfg: DictConfig):
     datamodule = hydra.utils.instantiate(cfg.datamodule)
     
     # Instantiate model
-    model = hydra.utils.instantiate(cfg.lightning_module)
+    model = hydra.utils.instantiate(cfg.lightning_module, _recursive_=False)
     
     # Instantiate trainer (with callbacks and logger)
     trainer = hydra.utils.instantiate(cfg.trainer_full)

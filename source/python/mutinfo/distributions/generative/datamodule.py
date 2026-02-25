@@ -152,6 +152,7 @@ class CustomFlowDataModule(pl.LightningDataModule):
         n_test_samples: int = 10000,
         batch_size: int = 256,
         num_workers: int = 0,
+        scale_dataset: bool = False,
     ):
         """
         Initialize custom DataModule.
@@ -164,6 +165,7 @@ class CustomFlowDataModule(pl.LightningDataModule):
             n_test_samples: Number of test samples
             batch_size: Batch size for dataloaders
             num_workers: Number of workers for data loading
+            scale_dataset: Whether to scale dataset to fit in [-1, 1] range
         """
         super().__init__()
         self.save_hyperparameters(ignore=['data_generator', 'prior_generator'])
@@ -174,7 +176,7 @@ class CustomFlowDataModule(pl.LightningDataModule):
         self.n_test_samples = n_test_samples
         self.batch_size = batch_size
         self.num_workers = num_workers
-    
+        self.scale_dataset = scale_dataset
     def setup(self, stage=None):
         """Generate datasets."""
         if stage == 'fit' or stage is None:
@@ -183,6 +185,13 @@ class CustomFlowDataModule(pl.LightningDataModule):
             # Handle tuple returns (e.g., from sklearn make_moons)
             if isinstance(train_data, tuple):
                 train_data = train_data[0]
+            
+            if self.scale_dataset:
+                # Scale to fit in [-1, 1] range
+                max_val = train_data.max()
+                min_val = train_data.min()
+                scale = max(max_val, -min_val)
+                train_data = train_data / scale
             
             train_prior = self.prior_generator(self.n_train_samples, train_data.shape[1])
             self.train_dataset = TensorDataset(
@@ -195,6 +204,13 @@ class CustomFlowDataModule(pl.LightningDataModule):
             if isinstance(val_data, tuple):
                 val_data = val_data[0]
                 
+            if self.scale_dataset:
+                # Scale to fit in [-1, 1] range
+                max_val = val_data.max()
+                min_val = val_data.min()
+                scale = max(max_val, -min_val)
+                val_data = val_data / scale
+                
             val_prior = self.prior_generator(self.n_val_samples, val_data.shape[1])
             self.val_dataset = TensorDataset(
                 torch.FloatTensor(val_data),
@@ -206,6 +222,13 @@ class CustomFlowDataModule(pl.LightningDataModule):
             test_data = self.data_generator(self.n_test_samples)
             if isinstance(test_data, tuple):
                 test_data = test_data[0]
+            
+            if self.scale_dataset:
+                # Scale to fit in [-1, 1] range
+                max_val = test_data.max()
+                min_val = test_data.min()
+                scale = max(max_val, -min_val)
+                test_data = test_data / scale
                 
             test_prior = self.prior_generator(self.n_test_samples, test_data.shape[1])
             self.test_dataset = TensorDataset(

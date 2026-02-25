@@ -1,31 +1,25 @@
-# Training configuration for Make Moons dataset
+# Training configuration for Make s_curve dataset
 
 defaults:
   - /model: flow_mlp_simple
-  - /datamodule: moons
+  - /datamodule: s_curve
   - /optimizer: adam
   - _self_
 
-# Set prior dimension to 2D for moons dataset
-prior_dim: 2
+prior_dim: 3
 
-# No image shape for 2D data
 image_shape: null
 
-# Sample logging settings for 2D data
 log_samples: true
-log_every_n_epochs: 5  # Log more frequently for fast 2D training
-n_samples_to_log: 64   # More samples for 2D scatter plot
+log_every_n_epochs: 5
+n_samples_to_log: 512   
 
-# Note: ODE trajectory is automatically logged for 2D data
-# showing the transformation from prior to data at different timesteps
 
-# FlowMLP works well for 2D data
 model:
-  dim: 2
+  dim: 3
   h: 64
 
-# Higher learning rate for small model
+
 optimizer:
   lr: 1.0e-2
 
@@ -46,10 +40,10 @@ lightning_module:
 use_ema: true
 ema_decay: 0.999
 
-# Override trainer configuration for 2D datasets
+# Override trainer configuration for 3D datasets
 trainer_full:
   _target_: pytorch_lightning.Trainer
-  max_epochs: 100
+  max_epochs: 200
   accelerator: auto
   devices: 1
   precision: 32
@@ -62,8 +56,8 @@ trainer_full:
       mode: min
       save_top_k: 3
       save_last: true
-      filename: 'flow-moons-{epoch:02d}-{val_loss:.4f}'
-      dirpath: checkpoints_moons
+      filename: 'flow-s_curve-{epoch:02d}-{val_loss:.4f}'
+      dirpath: checkpoints_s_curve
       verbose: true
     - _target_: pytorch_lightning.callbacks.EarlyStopping
       monitor: val_loss
@@ -75,6 +69,6 @@ trainer_full:
   logger:
     _target_: pytorch_lightning.loggers.WandbLogger
     project: tmlr
-    name: flow_moons
+    name: flow_s_curve
     save_dir: logs
     log_model: false

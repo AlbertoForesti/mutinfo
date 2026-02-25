@@ -10,9 +10,10 @@ num_workers: 0
 
 # Data generator using sklearn make_moons
 data_generator:
-  _target_: sklearn.datasets.make_moons
+  _target_: sklearn.datasets.make_blobs
   _partial_: true
-  noise: 0.05
+  cluster_std: 1.0
+  n_features: 2
   random_state: 42
 
 # Prior generator using numpy random normal
